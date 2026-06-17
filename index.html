@@ -227,7 +227,11 @@ body {
 <!-- 成就区 -->
 <div id="achievements"></div>
 
+<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+<button class="reset-btn" onclick="sharePredictions()">📤 分享我的预测</button>
 <button class="reset-btn" onclick="if(confirm('清空所有预测数据?')){localStorage.clear();location.reload()}">🔄 重新开始</button>
+</div>
+<div id="shareOutput" style="display:none;background:#1a1f35;border-radius:8px;padding:10px;margin-top:8px;font-size:12px;color:#ccc;word-break:break-all"></div>
 <div class="footer">⚽ 纯娱乐 · 比分数据由Tom更新</div>
 
 <!-- 弹窗 -->
@@ -539,6 +543,37 @@ document.querySelectorAll('.view-toggle button').forEach(btn => {
     document.getElementById('bracketView').classList.toggle('active', view === 'bracket');
   });
 });
+
+// ===== 分享预测 =====
+function sharePredictions() {
+  const preds = getPredictions();
+  const champ = getChampion();
+  let lines = ['🏆 我的世界杯预测', ''];
+  for (const m of R16) {
+    const p = preds[m.id];
+    const res = RESULTS[m.id];
+    if (p || res) {
+      const s = p ? `${p.h}:${p.a}` : '';
+      const r = res ? `[${res.h}:${res.a}]` : '';
+      lines.push(`  ${m.home} ${s} ${m.away} ${r}`);
+    } else {
+      lines.push(`  ${m.home} vs ${m.away} ⏳`);
+    }
+  }
+  if (champ) lines.push(`🏆 总冠军: ${champ}`);
+  
+  const text = lines.join('\n');
+  const el = document.getElementById('shareOutput');
+  el.textContent = text;
+  el.style.display = 'block';
+  
+  // 尝试复制
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      el.textContent = '✅ 已复制到剪贴板！\n\n' + text;
+    }).catch(() => {});
+  }
+}
 
 // ===== 冠军选择 =====
 document.getElementById('championSelect').addEventListener('change', function() {
