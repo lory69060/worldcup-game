@@ -114,6 +114,17 @@ body {
 
 .bracket-view { display: none; }
 .bracket-view.active { display: block; }
+.bracket-container { overflow-x: auto; padding: 8px 0; }
+.bracket-grid { display: flex; gap: 0; min-width: 640px; }
+.bracket-col { flex: 1; display: flex; flex-direction: column; justify-content: space-around; padding: 0 6px; position: relative; }
+.bracket-col-title { font-size: 11px; color: #f0c040; text-align: center; padding: 6px 0; font-weight: 600; }
+.b-col-match { background: #151b30; border: 1px solid #252a40; border-radius: 6px; padding: 6px 8px; margin: 4px 0; font-size: 12px; cursor: pointer; min-width: 120px; }
+.b-col-match.predicted { border-color: #f0c040; }
+.b-col-match .bm-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+.b-col-match .bm-s { color: #f0c040; font-weight: 700; font-size: 13px; min-width: 22px; text-align: center; }
+.b-col-match .bm-tbd { color: #555; font-style: italic; }
+.b-col-match .bm-conn { font-size: 10px; color: #444; text-align: center; padding: 2px 0 0; border-top: 1px solid #1a1f35; margin-top: 2px; }
+.b-col-match .bm-ok { color: #4caf50; } .b-col-match .bm-miss { color: #f44336; } .b-col-match .bm-pend { color: #888; }
 .list-view { display: block; }
 .list-view.hidden { display: none; }
 
@@ -385,9 +396,90 @@ function getQualifier(qfId, side, m1, m2, preds) {
   return side === 'home' ? m1.away : m2.home; // placeholder
 }
 
+function getWinner(mId, preds) {
+  const p = preds[mId];
+  const m = R16.find(x=>x.id===mId);
+  if (!m) return null;
+  return p ? {team: m.home, score: p.h} : null;
+}
+
 function renderBracket(preds) {
   const el = document.getElementById('bracketView');
-  el.innerHTML = `<div style="text-align:center;padding:20px;color:#555;font-size:13px">📱 横屏或滚动查看完整对阵图<br><small>列表视图更好操作</small></div>`;
+  
+  function bm(id, home, away, preds) {
+    const p = preds[id];
+    const res = RESULTS[id];
+    let cls = 'b-col-match';
+    if (p) cls += ' predicted';
+    const h = res ? res.h : (p ? p.h : '');
+    const a = res ? res.a : (p ? p.a : '');
+    let status = '';
+    if (res && p) {
+      if (p.h===res.h && p.a===res.a) status = '<span class="bm-ok">🎯</span>';
+      else if ((p.h-p.a)*(res.h-res.a)>0 || (res.h===res.a && p.h===p.a)) status = '<span class="bm-ok">✅</span>';
+      else status = '<span class="bm-miss">❌</span>';
+    } else if (p) status = '<span class="bm-pend">🔮</span>';
+    else if (res) status = '';
+    return `<div class="${cls}" onclick="openModal('${id}','${home}','${away}')">
+      <div class="bm-row"><span>${home}</span><span class="bm-s">${h}</span></div>
+      <div class="bm-row"><span>${away}</span><span class="bm-s">${a}</span></div>
+      <div class="bm-conn">${status}${res ? res.h+':'+res.a : ''}</div>
+    </div>`;
+  }
+  
+  function qualifierName(qfId, side) {
+    const src = R16.filter(m=>m.qf===qfId);
+    if (src.length < 2) return 'TBD';
+    const r1 = RESULTS[src[0].id], r2 = RESULTS[src[1].id];
+    if (r1 && r2) {
+      const w1 = r1.h > r1.a ? src[0].home : (r1.h < r1.a ? src[0].away : '?');
+      const w2 = r2.h > r2.a ? src[1].home : (r2.h < r2.a ? src[1].away : '?');
+      return side === 'home' ? w1 : w2;
+    }
+    return side === 'home' ? src[0].away : src[1].home;
+  }
+
+  // R16上半区 (match 1-4)
+  let col1 = '<div class="bracket-col">';
+  col1 += '<div class="bracket-col-title">⚔️ 16强</div>';
+  for (let i = 0; i < 4; i++) {
+    const m = R16[i];
+    col1 += bm(m.id, m.home, m.away, preds);
+  }
+  // R16下半区 (5-8)
+  for (let i = 4; i < 8; i++) {
+    const m = R16[i];
+    col1 += bm(m.id, m.home, m.away, preds);
+  }
+  col1 += '</div>';
+  
+  // QF
+  let col2 = '<div class="bracket-col">';
+  col2 += '<div class="bracket-col-title">🏅 8强</div>';
+  for (const qfId of QF) {
+    const h = qualifierName(qfId, 'home');
+    const a = qualifierName(qfId, 'away');
+    col2 += bm(qfId, h, a, preds);
+  }
+  col2 += '<div style="height:60px"></div></div>';
+  
+  // SF
+  let col3 = '<div class="bracket-col">';
+  col3 += '<div class="bracket-col-title">🌟 半决赛</div>';
+  col3 += bm('sf1', '上半区胜者', '上半区胜者', preds);
+  col3 += '<div style="height:120px"></div>';
+  col3 += bm('sf2', '下半区胜者', '下半区胜者', preds);
+  col3 += '</div>';
+  
+  // Final
+  let col4 = '<div class="bracket-col">';
+  col4 += '<div class="bracket-col-title">🏆 决赛</div>';
+  col4 += '<div style="height:80px"></div>';
+  col4 += bm('final', '半决赛胜者', '半决赛胜者', preds);
+  col4 += '</div>';
+  
+  el.innerHTML = `<div class="bracket-container"><div class="bracket-grid">${col1}${col2}${col3}${col4}</div></div>
+  <div style="text-align:center;font-size:11px;color:#555;margin-top:8px">👆 点击可修改预测</div>`;
 }
 
 function renderAchievements(score) {
