@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🏆 世界杯·猜球游戏</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  background: #0a0e1a;
+  color: #e0e0e0;
+  min-height: 100vh;
+  padding: 12px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.header {
+  text-align: center;
+  padding: 16px 0 8px;
+}
+.header h1 { font-size: 22px; color: #f0c040; letter-spacing: 1px; }
+.header p { font-size: 13px; color: #888; margin-top: 4px; }
+.header .stats { display: flex; justify-content: center; gap: 20px; margin-top: 10px; font-size: 13px; }
+.header .stats span { color: #aaa; }
+.header .stats b { color: #f0c040; }
+
+.round-label {
+  font-size: 14px;
+  color: #f0c040;
+  font-weight: 600;
+  padding: 16px 4px 8px;
+  border-bottom: 1px solid #1a1f35;
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.match-card {
+  background: linear-gradient(135deg, #151b30, #1a1f35);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 8px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #252a40;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+.match-card:active { transform: scale(0.98); }
+.match-card.predicted { border-color: #f0c040; background: linear-gradient(135deg, #1a1f35, #1f2440); }
+.match-card.finished { opacity: 0.85; }
+.match-card .time { font-size: 11px; color: #666; width: 44px; flex-shrink: 0; }
+.match-card .teams { flex: 1; text-align: center; }
+.match-card .team-row { display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 14px; padding: 2px 0; }
+.match-card .team-row .score { 
+  display: inline-block; width: 26px; text-align: center; font-weight: 700; font-size: 16px;
+  color: #f0c040;
+}
+.match-card .team-row .score-input {
+  width: 32px; height: 32px; text-align: center; font-size: 16px; font-weight: 700;
+  background: #0a0e1a; border: 1px solid #333; border-radius: 6px; color: #f0c040;
+  outline: none;
+}
+.match-card .team-row .score-input:focus { border-color: #f0c040; }
+.match-card .team-row .vs { font-size: 11px; color: #555; }
+.match-card .status-icon { font-size: 16px; width: 28px; text-align: center; flex-shrink: 0; }
+
+/* Modal */
+.modal-overlay {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  justify-content: center; align-items: center;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: #151b30;
+  border-radius: 16px;
+  padding: 24px;
+  width: 300px;
+  border: 1px solid #252a40;
+}
+.modal h3 { text-align: center; color: #f0c040; margin-bottom: 16px; font-size: 18px; }
+.modal .modal-teams { text-align: center; font-size: 16px; margin-bottom: 20px; }
+.modal .score-inputs { display: flex; justify-content: center; align-items: center; gap: 16px; margin-bottom: 20px; }
+.modal .score-inputs input {
+  width: 60px; height: 50px; text-align: center; font-size: 24px; font-weight: 700;
+  background: #0a0e1a; border: 2px solid #333; border-radius: 10px; color: #f0c040;
+  outline: none;
+}
+.modal .score-inputs input:focus { border-color: #f0c040; }
+.modal .btn-row { display: flex; gap: 10px; }
+.modal button {
+  flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600;
+  cursor: pointer;
+}
+.modal .btn-confirm { background: #f0c040; color: #0a0e1a; }
+.modal .btn-cancel { background: #252a40; color: #aaa; }
+
+/* Bracket View */
+.view-toggle {
+  display: flex; justify-content: center; gap: 8px; margin: 12px 0;
+}
+.view-toggle button {
+  padding: 6px 20px; border: 1px solid #252a40; border-radius: 20px;
+  background: transparent; color: #888; font-size: 13px; cursor: pointer;
+}
+.view-toggle button.active { background: #f0c040; color: #0a0e1a; border-color: #f0c040; }
+
+.bracket-view { display: none; }
+.bracket-view.active { display: block; }
+.list-view { display: block; }
+.list-view.hidden { display: none; }
+
+/* Bracket layout */
+.bracket-round { margin-bottom: 8px; }
+.bracket-round-title { font-size: 12px; color: #f0c040; margin: 4px 0; text-align: center; }
+.bracket-match {
+  background: #151b30;
+  border: 1px solid #252a40;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin: 3px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  cursor: pointer;
+}
+.bracket-match.predicted { border-color: #f0c040; }
+.bracket-match .bm-teams { flex: 1; }
+.bracket-match .bm-team { display: flex; justify-content: space-between; padding: 1px 0; }
+.bracket-match .bm-score { color: #f0c040; font-weight: 600; }
+.bracket-match .bm-tbd { color: #555; font-style: italic; }
+.bracket-connector { height: 12px; border-left: 1px solid #252a40; margin-left: 50%; }
+
+/* Achievements */
+.achievement {
+  background: linear-gradient(135deg, #1a1f35, #151b30);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 6px 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #252a40;
+}
+.achievement .ach-icon { font-size: 20px; }
+.achievement .ach-text { color: #ccc; }
+.achievement .ach-text b { color: #f0c040; }
+
+.footer { text-align: center; padding: 24px 0; font-size: 12px; color: #555; }
+
+/* Champion pick */
+.champion-section {
+  background: linear-gradient(135deg, #1a1f35, #151b30);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  border: 1px solid #252a40;
+  text-align: center;
+}
+.champion-section h3 { font-size: 14px; color: #f0c040; margin-bottom: 8px; }
+.champion-section select {
+  padding: 8px 16px; border-radius: 8px; border: 1px solid #333;
+  background: #0a0e1a; color: #f0c040; font-size: 14px; outline: none;
+  width: 100%; max-width: 240px;
+}
+.champion-section .champion-pick { color: #f0c040; font-weight: 600; margin-top: 6px; }
+
+/* Reset button */
+.reset-btn {
+  background: transparent; border: 1px solid #333; color: #555;
+  padding: 6px 16px; border-radius: 6px; font-size: 12px; cursor: pointer;
+  margin-top: 12px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏆 世界杯猜球</h1>
+  <p>自己跟自己玩 · 你 vs 你</p>
+  <div class="stats">
+    <span>已猜 <b id="predictedCount">0</b>/<b id="totalCount">15</b></span>
+    <span>正确 <b id="correctCount">-</b></span>
+    <span>得分 <b id="scoreDisplay">-</b></span>
+  </div>
+</div>
+
+<div class="champion-section">
+  <h3>🏆 总冠军预测（猜对 +10分）</h3>
+  <select id="championSelect">
+    <option value="">— 选一支冠军 —</option>
+  </select>
+  <div id="championPick" class="champion-pick"></div>
+</div>
+
+<div class="view-toggle">
+  <button class="active" data-view="list">📋 列表</button>
+  <button data-view="bracket">🔀 对阵图</button>
+</div>
+
+<!-- 列表视图 -->
+<div id="listView" class="list-view"></div>
+
+<!-- 对阵图视图 -->
+<div id="bracketView" class="bracket-view"></div>
+
+<!-- 成就区 -->
+<div id="achievements"></div>
+
+<button class="reset-btn" onclick="if(confirm('清空所有预测数据?')){localStorage.clear();location.reload()}">🔄 重新开始</button>
+<div class="footer">⚽ 纯娱乐 · 比分数据由Tom更新</div>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modalTitle">预测比分</h3>
+    <div class="modal-teams" id="modalTeams"></div>
+    <div class="score-inputs">
+      <input type="number" id="modalHome" min="0" max="15" placeholder="0">
+      <span style="color:#555;font-size:16px">:</span>
+      <input type="number" id="modalAway" min="0" max="15" placeholder="0">
+    </div>
+    <div class="btn-row">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-confirm" onclick="confirmPrediction()">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 数据 =====
+const TEAMS = ["葡萄牙","民主刚果","英格兰","克罗地亚","加纳","巴拿马","乌兹别克","哥伦比亚",
+               "捷克","南非","瑞士","波黑","加拿大","卡塔尔","墨西哥","韩国"];
+const R16 = [
+  {id:"r16_01",home:"葡萄牙",away:"民主刚果",time:"06-18 01:00",qf:"qf1"},
+  {id:"r16_02",home:"英格兰",away:"克罗地亚",time:"06-18 04:00",qf:"qf1"},
+  {id:"r16_03",home:"加纳",away:"巴拿马",time:"06-18 07:00",qf:"qf2"},
+  {id:"r16_04",home:"乌兹别克",away:"哥伦比亚",time:"06-18 10:00",qf:"qf2"},
+  {id:"r16_05",home:"捷克",away:"南非",time:"06-19 00:00",qf:"qf3"},
+  {id:"r16_06",home:"瑞士",away:"波黑",time:"06-19 03:00",qf:"qf3"},
+  {id:"r16_07",home:"加拿大",away:"卡塔尔",time:"06-19 06:00",qf:"qf4"},
+  {id:"r16_08",home:"墨西哥",away:"韩国",time:"06-19 09:00",qf:"qf4"},
+];
+const QF = ["qf1","qf2","qf3","qf4"];
+const SF = ["sf1","sf2"];
+const ALL_IDS = R16.map(m=>m.id).concat(QF).concat(SF).concat(["final"]);
+
+// 比赛结果（由我更新）
+const RESULTS = {
+  // "r16_01": {h:2,a:1},   // 示例
+};
+
+// ===== localStorage 操作 =====
+function getPredictions() {
+  try { return JSON.parse(localStorage.getItem('wc_preds')) || {}; } catch { return {}; }
+}
+function setPrediction(matchId, h, a) {
+  const p = getPredictions();
+  p[matchId] = {h, a};
+  localStorage.setItem('wc_preds', JSON.stringify(p));
+}
+function getChampion() { return localStorage.getItem('wc_champion') || ''; }
+function setChampion(team) { localStorage.setItem('wc_champion', team); }
+
+// ===== 计算成绩 =====
+function calcScore() {
+  const preds = getPredictions();
+  let correct = 0, total = 0, points = 0;
+  for (const [id, res] of Object.entries(RESULTS)) {
+    const p = preds[id];
+    if (!p) continue;
+    total++;
+    const hp = p.h, ap = p.a, rh = res.h, ra = res.a;
+    if (hp === rh && ap === ra) { correct++; points += 5; }
+    else if ((hp-ap) * (rh-ra) > 0) { points += 2; }
+    else if (rh === ra && hp === ap) { points += 2; }
+  }
+  // 冠军加分
+  const champ = getChampion();
+  // 冠军结果待定
+  return {correct, total, points, predicted: Object.keys(preds).length};
+}
+
+// ===== 渲染 =====
+function render() {
+  const preds = getPredictions();
+  const champ = getChampion();
+  const score = calcScore();
+  
+  document.getElementById('predictedCount').textContent = score.predicted;
+  document.getElementById('totalCount').textContent = ALL_IDS.length;
+  document.getElementById('correctCount').textContent = Object.keys(RESULTS).length > 0 ? score.correct : '-';
+  document.getElementById('scoreDisplay').textContent = Object.keys(RESULTS).length > 0 ? score.points : '-';
+  
+  // 冠军选择
+  const sel = document.getElementById('championSelect');
+  if (sel.options.length <= 1) {
+    for (const t of TEAMS) {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t;
+      sel.appendChild(o);
+    }
+  }
+  sel.value = champ;
+  document.getElementById('championPick').textContent = champ ? `🏆 你猜 ${champ} 最终夺冠` : '';
+
+  // 渲染列表
+  renderList(preds);
+  renderBracket(preds);
+  renderAchievements(score);
+}
+
+function renderList(preds) {
+  const el = document.getElementById('listView');
+  let html = '<div class="round-label">⚔️ 16强</div>';
+  for (const m of R16) {
+    html += matchCardHTML(m.id, m.home, m.away, m.time, preds);
+  }
+  html += '<div class="round-label">🏅 8强</div>';
+  for (const qf of QF) {
+    const src = R16.filter(m=>m.qf===qf);
+    const home = getQualifier(qf, 'home', src[0], src[1], preds);
+    const away = getQualifier(qf, 'away', src[0], src[1], preds);
+    html += matchCardHTML(qf, home, away, '待定', preds);
+  }
+  html += '<div class="round-label">🌟 半决赛</div>';
+  for (const sf of SF) {
+    html += matchCardHTML(sf, 'TBD', 'TBD', '待定', preds);
+  }
+  html += '<div class="round-label">🏆 决赛</div>';
+  html += matchCardHTML('final', 'TBD', 'TBD', '待定', preds);
+  el.innerHTML = html;
+}
+
+function matchCardHTML(id, home, away, time, preds) {
+  const p = preds[id];
+  const res = RESULTS[id];
+  const isPredicted = !!p;
+  const isFinished = !!res;
+  let statusIcon = '⚪';
+  if (isFinished && p) {
+    const hp=p.h, ap=p.a, rh=res.h, ra=res.a;
+    if (hp===rh && ap===ra) statusIcon = '🎯';
+    else if ((hp-ap)*(rh-ra)>0 || (rh===ra && hp===ap)) statusIcon = '✅';
+    else statusIcon = '❌';
+  } else if (isPredicted) statusIcon = '🔮';
+  
+  const hScore = isFinished ? res.h : (p ? p.h : '');
+  const aScore = isFinished ? res.a : (p ? p.a : '');
+  
+  return `<div class="match-card ${isPredicted?'predicted':''} ${isFinished?'finished':''}" onclick="openModal('${id}','${home}','${away}')">
+    <div class="time">${time}</div>
+    <div class="teams">
+      <div class="team-row">
+        <span>${home}</span>
+        <span class="score">${hScore}</span>
+      </div>
+      <div class="team-row">
+        <span>${away}</span>
+        <span class="score">${aScore}</span>
+      </div>
+    </div>
+    <div class="status-icon">${statusIcon}</div>
+  </div>`;
+}
+
+function getQualifier(qfId, side, m1, m2, preds) {
+  // 找进入这一轮的球队
+  const r1 = RESULTS[m1.id];
+  const r2 = RESULTS[m2.id];
+  if (r1 && r2) {
+    const w1 = r1.h > r1.a ? m1.home : (r1.h < r1.a ? m1.away : '?');
+    const w2 = r2.h > r2.a ? m2.home : (r2.h < r2.a ? m2.away : '?');
+    return side === 'home' ? w1 : w2;
+  }
+  return side === 'home' ? m1.away : m2.home; // placeholder
+}
+
+function renderBracket(preds) {
+  const el = document.getElementById('bracketView');
+  el.innerHTML = `<div style="text-align:center;padding:20px;color:#555;font-size:13px">📱 横屏或滚动查看完整对阵图<br><small>列表视图更好操作</small></div>`;
+}
+
+function renderAchievements(score) {
+  const el = document.getElementById('achievements');
+  const preds = getPredictions();
+  const cnt = Object.keys(RESULTS).length;
+  if (cnt === 0) { el.innerHTML = ''; return; }
+  
+  let html = '<div class="round-label">🏅 成就</div>';
+  
+  if (score.correct >= cnt && cnt > 0) html += `<div class="achievement"><span class="ach-icon">🎯</span><span class="ach-text"><b>百发百中！</b>全部猜对，你是天选之人</span></div>`;
+  if (score.correct === 0 && cnt > 0) html += `<div class="achievement"><span class="ach-icon">🕯️</span><span class="ach-text"><b>反向明灯</b>一个都没对，也是一种天赋</span></div>`;
+  if (score.correct >= 3) html += `<div class="achievement"><span class="ach-icon">🔥</span><span class="ach-text">连对 <b>${score.correct}</b> 场，状态火热</span></div>`;
+  
+  el.innerHTML = html;
+}
+
+// ===== 弹窗 =====
+let modalTarget = '';
+
+function openModal(id, home, away) {
+  if (RESULTS[id]) return; // 已结束不可改
+  modalTarget = id;
+  document.getElementById('modalTitle').textContent = id.startsWith('r16') ? '⚽ 预测16强比分' : '🔮 预测晋级比分';
+  document.getElementById('modalTeams').textContent = `${home} vs ${away}`;
+  
+  const preds = getPredictions();
+  const p = preds[id];
+  document.getElementById('modalHome').value = p ? p.h : '';
+  document.getElementById('modalAway').value = p ? p.a : '';
+  
+  document.getElementById('modal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('active');
+}
+
+function confirmPrediction() {
+  const h = parseInt(document.getElementById('modalHome').value);
+  const a = parseInt(document.getElementById('modalAway').value);
+  if (isNaN(h) || isNaN(a)) { alert('请输入比分'); return; }
+  if (h > 15 || a > 15) { alert('比分最多15球'); return; }
+  
+  setPrediction(modalTarget, h, a);
+  closeModal();
+  render();
+}
+
+// ===== 视图切换 =====
+document.querySelectorAll('.view-toggle button').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const view = this.dataset.view;
+    document.getElementById('listView').classList.toggle('hidden', view !== 'list');
+    document.getElementById('bracketView').classList.toggle('active', view === 'bracket');
+  });
+});
+
+// ===== 冠军选择 =====
+document.getElementById('championSelect').addEventListener('change', function() {
+  if (this.value) {
+    setChampion(this.value);
+    render();
+  }
+});
+
+// ===== 启动 =====
+render();
+</script>
+</body>
+</html>
